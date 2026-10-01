@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>3D Texture Viewer</title>
+  <title>3D Texture & Displacement Map Viewer</title>
   <style>
     * {
       box-sizing: border-box;
@@ -15,9 +15,9 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #121212;
+      background-color: #0f172a;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #e0e0e0;
+      color: #e2e8f0;
     }
     #canvas-container {
       width: 100%;
@@ -28,26 +28,26 @@
       z-index: 1;
     }
     
-    /* UI Overlay */
     .ui-panel {
       position: absolute;
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
-      width: 90%;
+      width: 92%;
       max-width: 480px;
-      background: rgba(24, 24, 28, 0.85);
+      max-height: 85vh;
+      overflow-y: auto;
+      background: rgba(15, 23, 42, 0.88);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 16px;
       padding: 16px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       gap: 12px;
-      transition: transform 0.3s ease, opacity 0.3s ease;
     }
     
     .panel-header {
@@ -56,9 +56,10 @@
       align-items: center;
     }
     .panel-title {
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
       color: #ffffff;
+      letter-spacing: 0.3px;
     }
     
     .slots-container {
@@ -73,19 +74,19 @@
       padding: 10px;
       text-align: center;
       position: relative;
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.25);
       transition: all 0.2s ease;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 80px;
+      min-height: 75px;
     }
     
     .file-slot:active, .file-slot.has-file {
-      border-color: #3b82f6;
-      background: rgba(59, 130, 246, 0.1);
+      border-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
     }
     
     .file-slot input[type="file"] {
@@ -99,17 +100,17 @@
     }
     
     .slot-label {
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: #aaa;
+      color: #94a3b8;
       margin-bottom: 4px;
     }
     
     .file-name {
       font-size: 11px;
-      color: #3b82f6;
+      color: #38bdf8;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -119,41 +120,69 @@
     .controls-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      font-size: 12px;
+      gap: 10px;
+      font-size: 11px;
     }
     
     .control-group {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 3px;
     }
     
     .control-group label {
-      color: #888;
+      color: #94a3b8;
       font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .checkbox-group {
+      grid-column: span 2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #38bdf8;
+      cursor: pointer;
+    }
+
+    .checkbox-group label {
+      color: #f1f5f9;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
     }
     
     input[type="range"] {
       width: 100%;
-      accent-color: #3b82f6;
+      accent-color: #38bdf8;
     }
     
     .btn {
-      background: #3b82f6;
+      background: #0284c7;
       color: white;
       border: none;
       padding: 10px;
       border-radius: 8px;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       transition: background 0.2s;
       width: 100%;
     }
     
     .btn:active {
-      background: #2563eb;
+      background: #0369a1;
     }
     
     .toast {
@@ -161,7 +190,8 @@
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.3);
       color: white;
       padding: 8px 16px;
       border-radius: 20px;
@@ -170,23 +200,24 @@
       opacity: 0;
       transition: opacity 0.3s;
       pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     .toast.show {
       opacity: 1;
     }
   </style>
-  <!-- Three.js and OrbitControls -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 
+  <!-- Canvas Container and Toast Overlay -->
   <div id="canvas-container"></div>
   <div id="toast" class="toast">Texture Loaded</div>
 
   <div class="ui-panel">
     <div class="panel-header">
-      <span class="panel-title">Texture Viewer</span>
+      <span class="panel-title">3D Texture & Displacement Viewer</span>
     </div>
 
     <div class="slots-container">
@@ -196,27 +227,41 @@
         <input type="file" id="color-input" accept="image/*">
       </div>
       <div class="file-slot" id="normal-slot">
-        <span class="slot-label">Normal Map</span>
+        <span class="slot-label">Normal / Height Map</span>
         <span class="file-name" id="normal-name">Tap to select</span>
         <input type="file" id="normal-input" accept="image/*">
       </div>
     </div>
 
     <div class="controls-grid">
-      <div class="control-group">
-        <label>Roughness</label>
-        <input type="range" id="roughness" min="0" max="1" step="0.05" value="0.5">
+      <!-- Displacement Toggle Checkbox -->
+      <div class="checkbox-group">
+        <input type="checkbox" id="enable-displacement">
+        <label for="enable-displacement">Enable Physical Displacement</label>
       </div>
+
       <div class="control-group">
-        <label>Metalness</label>
-        <input type="range" id="metalness" min="0" max="1" step="0.05" value="0.1">
+        <label>Displacement Scale <span id="disp-val">0.20</span></label>
+        <input type="range" id="disp-scale" min="0" max="1" step="0.02" value="0.2">
       </div>
+
       <div class="control-group">
-        <label>Normal Scale</label>
+        <label>Normal Scale <span id="normal-val">1.0</span></label>
         <input type="range" id="normal-scale" min="0" max="3" step="0.1" value="1">
       </div>
+
       <div class="control-group">
-        <label>Light Height</label>
+        <label>Roughness <span id="rough-val">0.50</span></label>
+        <input type="range" id="roughness" min="0" max="1" step="0.05" value="0.5">
+      </div>
+
+      <div class="control-group">
+        <label>Metalness <span id="metal-val">0.10</span></label>
+        <input type="range" id="metalness" min="0" max="1" step="0.05" value="0.1">
+      </div>
+
+      <div class="control-group" style="grid-column: span 2;">
+        <label>Light Height <span id="light-val">4.0</span></label>
         <input type="range" id="light-height" min="1" max="10" step="0.5" value="4">
       </div>
     </div>
@@ -225,13 +270,12 @@
   </div>
 
   <script>
-    // --- Scene Setup ---
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x121212);
+    scene.background = new THREE.Color(0x0f172a);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 3, 5);
+    camera.position.set(0, 3.5, 4.5);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -241,18 +285,16 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     container.appendChild(renderer.domElement);
 
-    // --- Controls ---
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 - 0.01; // Don't go below ground
+    controls.maxPolarAngle = Math.PI / 2 - 0.01;
     controls.touches = {
       ONE: THREE.TOUCH.ROTATE,
       TWO: THREE.TOUCH.DOLLY_PAN
     };
 
-    // --- Lighting ---
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -266,23 +308,21 @@
     dirLight.shadow.camera.right = 3;
     dirLight.shadow.camera.top = 3;
     dirLight.shadow.camera.bottom = -3;
-    // Shadow Bias Settings to eliminate banding/shadow acne
     dirLight.shadow.bias = -0.0005;
     dirLight.shadow.normalBias = 0.02;
     scene.add(dirLight);
 
-    // Helper Light Indicator Mesh
     const lightHelperGeo = new THREE.SphereGeometry(0.1, 16, 16);
-    const lightHelperMat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+    const lightHelperMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     const lightHelper = new THREE.Mesh(lightHelperGeo, lightHelperMat);
     dirLight.add(lightHelper);
 
-    // --- Mesh & Material ---
-    const planeGeo = new THREE.PlaneGeometry(3, 3, 64, 64);
+    const planeGeo = new THREE.PlaneGeometry(3, 3, 256, 256);
     const planeMat = new THREE.MeshStandardMaterial({
       color: 0xcccccc,
       roughness: 0.5,
       metalness: 0.1,
+      displacementScale: 0.2,
       side: THREE.DoubleSide
     });
     const plane = new THREE.Mesh(planeGeo, planeMat);
@@ -291,15 +331,14 @@
     plane.castShadow = true;
     scene.add(plane);
 
-    // Grid Floor
-    const grid = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
+    const grid = new THREE.GridHelper(10, 20, 0x334155, 0x1e293b);
     grid.position.y = -0.01;
     scene.add(grid);
 
-    // --- Texture Loading Engine ---
     const textureLoader = new THREE.TextureLoader();
     let pendingColorUrl = null;
     let pendingNormalUrl = null;
+    let loadedNormalTexture = null;
 
     function optimizeTexture(texture, isSRGB = false) {
       if (!texture) return;
@@ -356,8 +395,14 @@
           optimizeTexture(tex, false);
           if (planeMat.normalMap) planeMat.normalMap.dispose();
           planeMat.normalMap = tex;
+          loadedNormalTexture = tex;
+
+          // If displacement is enabled, apply the map to geometric displacement as well
+          const isDispEnabled = document.getElementById('enable-displacement').checked;
+          planeMat.displacementMap = isDispEnabled ? loadedNormalTexture : null;
+
           planeMat.needsUpdate = true;
-          showToast("Normal map applied!");
+          showToast("Normal/Height map applied!");
         });
         loadedAny = true;
       }
@@ -371,32 +416,56 @@
       const toast = document.getElementById('toast');
       toast.innerText = msg;
       toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2000);
+      setTimeout(() => toast.classList.remove('show'), 2200);
     }
 
-    // --- UI Listeners ---
     document.getElementById('color-input').addEventListener('change', (e) => handleFileSelect(e, 'color'));
     document.getElementById('normal-input').addEventListener('change', (e) => handleFileSelect(e, 'normal'));
     document.getElementById('reload-btn').addEventListener('click', applyTextures);
 
+    // Toggle Displacement Map On / Off
+    document.getElementById('enable-displacement').addEventListener('change', (e) => {
+      const isEnabled = e.target.checked;
+      if (loadedNormalTexture) {
+        planeMat.displacementMap = isEnabled ? loadedNormalTexture : null;
+        planeMat.needsUpdate = true;
+        showToast(isEnabled ? "Displacement enabled!" : "Displacement disabled.");
+      } else if (isEnabled) {
+        showToast("Upload a Normal/Height map first!");
+      }
+    });
+
+    // Slider Listeners
+    document.getElementById('disp-scale').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      planeMat.displacementScale = val;
+      document.getElementById('disp-val').innerText = val.toFixed(2);
+    });
+
     document.getElementById('roughness').addEventListener('input', (e) => {
-      planeMat.roughness = parseFloat(e.target.value);
+      const val = parseFloat(e.target.value);
+      planeMat.roughness = val;
+      document.getElementById('rough-val').innerText = val.toFixed(2);
     });
 
     document.getElementById('metalness').addEventListener('input', (e) => {
-      planeMat.metalness = parseFloat(e.target.value);
+      const val = parseFloat(e.target.value);
+      planeMat.metalness = val;
+      document.getElementById('metal-val').innerText = val.toFixed(2);
     });
 
     document.getElementById('normal-scale').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       planeMat.normalScale.set(val, val);
+      document.getElementById('normal-val').innerText = val.toFixed(1);
     });
 
     document.getElementById('light-height').addEventListener('input', (e) => {
-      dirLight.position.y = parseFloat(e.target.value);
+      const val = parseFloat(e.target.value);
+      dirLight.position.y = val;
+      document.getElementById('light-val').innerText = val.toFixed(1);
     });
 
-    // --- Render Loop & Resize ---
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
